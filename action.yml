@@ -1,13 +1,16 @@
 name: "Last Green Commit Action"
-description: "Get the last green commit on your branch."
-author: "Ben Brandt / Talentpair"
+description: "Get the last green commit on your Pull Request."
+author: "Kalman Bencze, Ben Brandt / Talentpair"
 inputs:
   github-token:
     description: The GitHub token used to create an authenticated client
     required: true
+  checks:
+    description: The name of the checks to verify that are green, separated by a comma
+    required: false
 outputs:
   result:
-    description: The sha of the last green commit, or an empty string.
+    description: The sha of the last green commit, or the sha of the base branch.
 runs:
   using: "node16"
   main: "dist/index.js"

@@ -55,25 +55,55 @@ process.on("unhandledRejection", handleError);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         const token = core.getInput("github-token", { required: true });
+        const checks = core.getInput("checks", { required: false }).split(",");
         const octokit = (0, github_1.getOctokit)(token);
-        const branch = github_1.context.ref.replace("refs/heads/", "");
-        const { data: commits } = yield octokit.rest.repos.listCommits({
+        const pull_number = parseInt(github_1.context.ref.replace("refs/pull/", "").replace("/merge", ""));
+        const { data: rawCommits } = yield octokit.rest.pulls.listCommits({
             owner: github_1.context.repo.owner,
             repo: github_1.context.repo.repo,
-            sha: branch,
+            pull_number: pull_number,
         });
+        let commits = rawCommits.reverse();
         core.info(`Number of commits: ${commits.length}`);
+        core.info(`Commits:\n${commits.map(commit => { var _a; return ((_a = commit.commit.author) === null || _a === void 0 ? void 0 : _a.name) + ": " + commit.commit.message.split("\n")[0]; }).join("\n")}`);
+        let response = yield octokit.rest.pulls.get({
+            owner: github_1.context.repo.owner,
+            repo: github_1.context.repo.repo,
+            pull_number: pull_number,
+        });
         let result = "";
-        for (const { sha } of commits) {
-            const { data: { check_suites: checkSuites }, } = yield octokit.rest.checks.listSuitesForRef({
+        let depth = 0;
+        for (const { sha, commit } of commits) {
+            depth++;
+            core.info(`Checking commit at depth: ${depth}`);
+            const { data: { check_runs: checkSuites }, } = yield octokit.rest.checks.listForRef({
                 owner: github_1.context.repo.owner,
                 repo: github_1.context.repo.repo,
                 ref: sha,
             });
-            const success = checkSuites.find((c) => c.status === "completed" && c.conclusion === "success");
-            if (success) {
-                result = success.head_sha;
-                break;
+            if (checks != null) {
+                let sha = "";
+                const results = [];
+                checks.forEach(checkName => {
+                    var _a;
+                    const check = checkSuites.find((c) => (c.name === checkName && c.status === "completed" && c.conclusion === "success"));
+                    if (check != null) {
+                        sha = check.head_sha;
+                        core.info(`Found successful check for: ${checkName}, for commit ${((_a = commit.author) === null || _a === void 0 ? void 0 : _a.name) + ": " + commit.message}`);
+                    }
+                    results.push(check != undefined);
+                });
+                if (results.find(e => e === false) === undefined) {
+                    result = sha;
+                    break;
+                }
+            }
+            else {
+                const success = checkSuites.find((c) => c.status === "completed" && c.conclusion === "success");
+                if (success) {
+                    result = success.head_sha;
+                    break;
+                }
             }
         }
         core.info(`Commit: ${result}`);

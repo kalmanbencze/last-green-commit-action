@@ -19,6 +19,7 @@ jobs:
         id: last-green-commit
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
+          checks: "UnitTest Check,Formatting Check"
       # In our case, this is a node script that reads the ENV variable and does the git diffing analysis
       - run: yarn test:ci
         env:
